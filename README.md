@@ -52,25 +52,14 @@ This will do three things:
 ```
 GROUNDING PROFILE SUMMARY
 ============================================================
-  G0  Authenticity:     Strong (learned via REINFORCE)
-  G1  Preservation:     ε_pres  = 0.0300
-  G2a Faithfulness:     ε_faith = 0.0409
-  G2b Etiological:      ACE(M)  = 1.0
-  G3  Robustness:       ω_U(0.5) = 0.0881
-  G4  Compositionality: δ_comp  = 0.0309
+  G0  (authenticity):     Strong (learned via REINFORCE)
+  G1  (preservation):     ε_pres  = 0.0300
+  G2a (faithfulness):     ε_faith = 0.0409
+  G2b (etiological):      ACE(M)  = 1.0
+  G3  (robustness):       ω_U(0.5) = 0.0881
+  G4  (compositionality): δ_comp  = 0.0309
 ============================================================
 ```
-
-## Note
-
-The audit reveals that G2a (accuracy) and G4 (systematicity) are orthogonal:
-
-| | High G4 | Low G4 |
-|---|---|---|
-| **High G2a** | *grounded* | *memorizer* |
-| **Low G2a** | *miscalibrated* | *lost* |
-
-The agent is grounded: its errors are calibration errors in atomic concepts.
 
 ## Citation
 ```bibtex
@@ -81,7 +70,3 @@ The agent is grounded: its errors are calibration errors in atomic concepts.
   year={2025}
 }
 ```
-
-## License
-
-MIT
