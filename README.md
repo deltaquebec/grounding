@@ -67,8 +67,8 @@ The audit reveals that G2a (accuracy) and G4 (systematicity) are orthogonal:
 
 | | High G4 | Low G4 |
 |---|---|---|
-| **High G2a** | *Grounded* | *Memorizer* |
-| **Low G2a** | *Miscalibrated* | *Lost* |
+| **High G2a** | *grounded* | *memorizer* |
+| **Low G2a** | *miscalibrated* | *lost* |
 
 The agent is grounded: its errors are calibration errors in atomic concepts.
 
