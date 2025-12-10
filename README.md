@@ -4,7 +4,7 @@ This repository accompanies the paper:
 
 > **On measuring grounding and generalizing grounding problems**
 > Daniel Quigley and Eric Maynard
-> [arXiv link forthcoming]
+> [arXiv link](https://www.arxiv.org/abs/2512.06205)
 
 ## Overview
 
