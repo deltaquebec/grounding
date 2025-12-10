@@ -63,10 +63,13 @@ GROUNDING PROFILE SUMMARY
 
 ## Citation
 ```bibtex
-@article{grounding2025,
-  title={Generalized Grounding: A Framework for Symbol Grounding Problems},
-  author={Quigley, Daniel and Maynard, Eric},
-  journal={arXiv preprint arXiv:XXXX.XXXXX},
-  year={2025}
+@misc{quigley2025measuringgroundinggeneralizinggrounding,
+      title={On measuring grounding and generalizing grounding problems}, 
+      author={Daniel Quigley and Eric Maynard},
+      year={2025},
+      eprint={2512.06205},
+      archivePrefix={arXiv},
+      primaryClass={cs.AI},
+      url={https://arxiv.org/abs/2512.06205}, 
 }
 ```
