@@ -1,12 +1,13 @@
 """
 Demonstrates agent grounding symbolic commands to spatial
-coordinates in a grid world, with a formal audit procedure (G0–G4)
+coordinates in grid-world, with a formal audit procedure (G0–G4)
 evaluating preservation, faithfulness, robustness, and compositionality.
 
 Paper: On measuring grounding and generalizing grounding problems 
 Author: Daniel Quigley and Eric Maynard
+Date: 12/29/2025
 
-Date: 12/05/2025
+TODO: this is bespoke. Generalize.
 """
 
 import torch
@@ -16,6 +17,7 @@ import numpy as np
 import random
 import sys
 from typing import List, Tuple
+
 
 class Tee:
     def __init__(self, filename):
@@ -33,14 +35,13 @@ class Tee:
     def close(self):
         self.file.close()
 
-# ==========================================
-# environment, context k
-# ==========================================
+
+# environment and context k
 
 class GridWorldContext:
     """
-    world context (k) and meaning type (t = ext)
-    defines the ground truth interpretation (I_k^t)
+    world context (k) and meaning type (t = ext);
+    defines the ground truth interpretation (I_k^t).
     """
     LANDMARKS = {
         'RED':  np.array([8.0, 8.0]),
@@ -55,6 +56,12 @@ class GridWorldContext:
     
     VOCAB = ['PAD', 'RED', 'BLUE', 'NORTH', 'SOUTH', 'EAST', 'WEST']
     
+    # held-out combinations for systematicity test
+    HELD_OUT = [
+        (['BLUE', 'EAST'], np.array([3.0, 2.0])),
+        (['RED', 'WEST'], np.array([7.0, 8.0])),
+    ]
+    
     @classmethod
     def get_ground_truth(cls, tokens: List[str]) -> np.array:
         """calculates I_k^t(tokens) via semantic algebra (vector addition)"""
@@ -67,54 +74,50 @@ class GridWorldContext:
         return target
 
     @classmethod
-    def sample_task(cls) -> Tuple[List[str], np.array]:
-        """generates random training task from distribution P"""
-        r = random.random()
-        if r < 0.2:
-            cmd = [random.choice(list(cls.VECTORS.keys()))]
-        elif r < 0.5:
-            cmd = [random.choice(list(cls.LANDMARKS.keys()))]
-        else:
-            lm = random.choice(list(cls.LANDMARKS.keys()))
-            vec = random.choice(list(cls.VECTORS.keys()))
-            cmd = [lm, vec]
-        return cmd, cls.get_ground_truth(cmd)
+    def sample_task(cls, exclude_held_out: bool = True) -> Tuple[List[str], np.array]:
+        """generates a random training task from distribution P"""
+        while True:
+            r = random.random()
+            if r < 0.2:
+                cmd = [random.choice(list(cls.VECTORS.keys()))]
+            elif r < 0.5:
+                cmd = [random.choice(list(cls.LANDMARKS.keys()))]
+            else:
+                lm = random.choice(list(cls.LANDMARKS.keys()))
+                vec = random.choice(list(cls.VECTORS.keys()))
+                cmd = [lm, vec]
+            
+            # skip held-out combinations during training
+            if exclude_held_out:
+                is_held_out = any(cmd == ho[0] for ho in cls.HELD_OUT)
+                if is_held_out:
+                    continue
+            
+            return cmd, cls.get_ground_truth(cmd)
 
 
-# ==========================================
-# agent architecture
-#    Φ: Σ* \to R     (encoder: embedding + GRU \to hidden state)
-#    Γ: R \to C      (decoder: hidden state \to coordinates)
-#    A_k^t: C \to M  (alignment: identity; agent moves to coords)
-# ==========================================
+# architecture for grounding
 
 class GridBotAgent(nn.Module):
     """
-    policy implementing grounding architecture
-    
-    we have the following:
-        Φ (encoder)  = self.embedding + self.gru  :  Σ* → R = ℝ^64
-        Γ (decoder)  = self.decoder               :  R → C = ℝ^2
-        A_k^t        = identity                   :  C → M_k^t = ℝ^2
+    neural policy implementing grounding architecture.
     """
     def __init__(self, vocab_size: int, emb_dim: int = 32, hidden_dim: int = 64):
         super().__init__()
         self.hidden_dim = hidden_dim
         
-        # Φ encoder components
+        # \Phi encoder components
         self.embedding = nn.Embedding(vocab_size, emb_dim, padding_idx=0)
         self.gru = nn.GRU(emb_dim, hidden_dim, batch_first=True)
         
-        # Γ decoder
+        # \Gamma decoder
         self.decoder = nn.Linear(hidden_dim, 2)
         
-        # audit hooks
-        self._representation_noise = None  # needed for G3 noise injected into R
-        self._ablate_modifiers = False     # and for G2b process only first token
+        self._representation_noise = None  # For G3: noise injected into R
+        self._ablate_modifiers = False     # For G2b: process only first token
 
     def encode(self, token_indices: torch.Tensor) -> torch.Tensor:
         """
-        Φ: Σ* → R
         maps token sequence to representation space (GRU hidden state)
         """
         embeds = self.embedding(token_indices)
@@ -134,18 +137,17 @@ class GridBotAgent(nn.Module):
 
     def decode(self, r: torch.Tensor) -> torch.Tensor:
         """
-        Γ: R → C
         maps representation to concept space (predicted coordinates)
         """
         return self.decoder(r)
 
     def forward(self, token_indices: torch.Tensor) -> torch.Tensor:
         """
-        Ψ = Γ ∘ Φ: Σ* → C
         end-to-end mapping from symbols to concepts
         
-        Note: in this toy example, A_k^t is identity, so the output
-        directly represents the agent's position in M_k^t
+        NOTE: here we have that A_k^t is identity, so output
+        directly represents the agent's position in M_k^t; this is not
+        the general scenario
         """
         r = self.encode(token_indices)  # Φ
         c = self.decode(r)               # Γ
@@ -153,19 +155,19 @@ class GridBotAgent(nn.Module):
 
 
 # ==========================================
-# training (check for G0)
+# training and G0
 # ==========================================
 
 def train_agent() -> Tuple[GridBotAgent, dict]:
     """
-    train via REINFORCE
-    note: for future work, add check for reporting extent of behavior
+    train agent via REINFORCE, establishing G0
+    
+    TODO: this is bespoke. Generalize this
     """
-    print("=" * 60)
-    print("G0: TRAINING AGENT")
-    print("=" * 60)
-    print("method: REINFORCE")
-    print("objective: minimize distance to target coordinates\n")
+    print("G0: TRAINING AGENT (establishing authenticity)")
+    print("Method: REINFORCE (policy gradient)")
+    print("objective: minimize distance to target coordinates")
+    print("note: BLUE EAST and RED WEST held out for systematicity test\n")
     
     vocab = {w: i for i, w in enumerate(GridWorldContext.VOCAB)}
     agent = GridBotAgent(len(vocab))
@@ -174,7 +176,7 @@ def train_agent() -> Tuple[GridBotAgent, dict]:
     EPISODES = 3000
     
     for episode in range(EPISODES):
-        cmd_str, target_pos = GridWorldContext.sample_task()
+        cmd_str, target_pos = GridWorldContext.sample_task(exclude_held_out=True)
         target = torch.tensor(target_pos, dtype=torch.float32).unsqueeze(0)
         
         indices = [vocab[w] for w in cmd_str]
@@ -188,27 +190,23 @@ def train_agent() -> Tuple[GridBotAgent, dict]:
         optimizer.step()
         
         if episode % 500 == 0:
-            print(f"  episode {episode:4d}: loss {loss.item():.4f} | Cmd: {cmd_str}")
+            print(f"  episode {episode:4d}: loss {loss.item():.4f} | cmd: {cmd_str}")
 
-    print("\nTraining complete!\n")
+    print("\ntraining complete.\n")
     return agent, vocab
 
 
-# ==========================================
 # grounding audit
-# ==========================================
 
 def audit_agent(agent: GridBotAgent, vocab: dict):
     """
-    perform grounding audit on trained agent.
+    perform grounding audit on trained agent
     """
-    print("=" * 60)
     print("GROUNDING AUDIT")
-    print("=" * 60)
     
     def get_output(cmd: List[str], ablate: bool = False, 
                    noise: torch.Tensor = None) -> np.ndarray:
-        """get A_k^t ∘ Ψ(cmd) with optional interventions"""
+        """helper: get A_k^t \cdot \Phi (cmd) with optional interventions"""
         indices = [vocab[w] for w in cmd]
         tokens = torch.tensor([indices], dtype=torch.long)
         
@@ -223,7 +221,7 @@ def audit_agent(agent: GridBotAgent, vocab: dict):
         
         return result.squeeze().numpy()
 
-    # ----- G1 -----
+    # G1 (preservation)
     print("\n[G1] PRESERVATION")
     print("     question: does Agent(RED) ≈ I(RED)?")
     
@@ -236,9 +234,9 @@ def audit_agent(agent: GridBotAgent, vocab: dict):
     print(f"     A_k^t ∘ Ψ(RED):       {agent_atom}")
     print(f"     ε_pres = {eps_pres:.4f}")
 
-    # ----- G2a-----
+    # G2a (correlational faithfulness)
     print("\n[G2a] CORRELATIONAL FAITHFULNESS")
-    print("      question: does Agent(RED NORTH) ≈ I(RED NORTH)?")
+    print("      question: does agent(RED NORTH) ≈ I(RED NORTH)?")
     
     phrase = ["RED", "NORTH"]
     truth_phrase = GridWorldContext.get_ground_truth(phrase)
@@ -249,7 +247,7 @@ def audit_agent(agent: GridBotAgent, vocab: dict):
     print(f"      A_k^t ∘ Ψ(RED NORTH):    {agent_phrase}")
     print(f"      ε_faith = {eps_faith:.4f}")
 
-    # ----- G2b -----
+    # G2b (etiological faithfulness)
     print("\n[G2b] ETIOLOGICAL FAITHFULNESS")
     print("      question: is modifier-processing mechanism M causally necessary?")
     
@@ -267,7 +265,7 @@ def audit_agent(agent: GridBotAgent, vocab: dict):
     print(f"      M ablated:  output = {pos_off}, success = {success_off}")
     print(f"      ACE(M) = {ace:.1f}")
 
-    # ----- G3 -----
+    # G3 (robustness)
     print("\n[G3] ROBUSTNESS")
     print("     question: how does semantic output change under perturbation of R?")
     
@@ -286,12 +284,12 @@ def audit_agent(agent: GridBotAgent, vocab: dict):
     print(f"     ω_U({NOISE_MAG}) = {drift:.4f} {'< ' if drift < NOISE_MAG else '>= '}{NOISE_MAG} (input)")
     print(f"     status: {'Stable (dampening)' if drift < NOISE_MAG else 'Unstable (amplifying)'}")
 
-    # ----- G4 -----
+    # G4 (compositionality (δ_comp))
     print("\n[G4] COMPOSITIONALITY")
-    print("     question: does Agent(RED NORTH) ≈ Agent(RED) + Agent(NORTH)?")
+    print("     question: does agent(RED NORTH) ≈ agent(RED) + agent(NORTH)?")
     
-    agent_whole = agent_phrase
-    agent_red = agent_atom
+    agent_whole = agent_phrase 
+    agent_red = agent_atom 
     agent_north = get_output(["NORTH"])
     
     sum_of_parts = agent_red + agent_north
@@ -302,17 +300,38 @@ def audit_agent(agent: GridBotAgent, vocab: dict):
     print(f"     (where A_k^t ∘ Ψ(NORTH) = {agent_north})")
     print(f"     δ_comp = {delta_comp:.4f}")
 
-    # ----- Summary -----
-    print("\n" + "=" * 60)
+    # systematicity
+    print("\n[G4 continued] SYSTEMATICITY (β)")
+    print("     question: does the agent generalize to held-out combinations?")
+    
+    TOLERANCE = 0.5  # threshold for "success"
+    
+    held_out_results = []
+    for cmd, truth in GridWorldContext.HELD_OUT:
+        agent_output = get_output(cmd)
+        error = np.linalg.norm(agent_output - truth)
+        success = error <= TOLERANCE
+        held_out_results.append({
+            'cmd': cmd,
+            'truth': truth,
+            'agent': agent_output,
+            'error': error,
+            'success': success
+        })
+        print(f"     {cmd}: output = {agent_output}, error = {error:.4f}, success = {success}")
+    
+    beta = sum(r['success'] for r in held_out_results) / len(held_out_results)
+    print(f"     β^{{k,t}} = {beta:.2f} (τ = {TOLERANCE})")
+
+    # summary 
     print("GROUNDING PROFILE SUMMARY")
-    print("=" * 60)
-    print(f"  G0  (authenticity):    strong (learned via REINFORCE)")
-    print(f"  G1  (preservation):    ε_pres  = {eps_pres:.4f}")
-    print(f"  G2a (faithfulness):    ε_faith = {eps_faith:.4f}")
-    print(f"  G2b (etiological):     ACE(M)  = {ace:.1f}")
-    print(f"  G3  (robustness):      ω_U({NOISE_MAG}) = {drift:.4f}")
-    print(f"  G4  (compositionality): δ_comp = {delta_comp:.4f}")
-    print("=" * 60)
+    print(f"  G0  authenticity:     strong (learned via REINFORCE)")
+    print(f"  G1  preservation:     ε_pres  = {eps_pres:.4f}")
+    print(f"  G2a faithfulness:     ε_faith = {eps_faith:.4f}")
+    print(f"  G2b etiological:      ACE(M)  = {ace:.1f}")
+    print(f"  G3  robustness:       ω_U({NOISE_MAG}) = {drift:.4f}")
+    print(f"  G4  compositionality: δ_comp  = {delta_comp:.4f}")
+    print(f"  G4  systematicity:    β       = {beta:.2f}")
 
 
 if __name__ == "__main__":
