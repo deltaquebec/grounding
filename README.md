@@ -25,40 +25,14 @@ The framework applies to symbolic, referential, vectorial, and relational ground
 ├── paper/
 │   └── grounding.pdf          # main paper
 ├── code/
-│   └── gridworld.py           # toy example implementation
+│   ├── audit_common.py           # collection of modules
+│   ├── gridworld_audit.py        # toy example implementation
+│   ├── pilot_audit.py            # toy example implementation
+│   └── test_gridworld_stub.py    # implementation artifact
+├── data/
+│   ├── men.txt            # MEN natural form full file
+│   └── simlex.txt         # SimLex-999.txt
 └── README.md
-```
-
-## Toy example: gridworld
-
-We provide a minimal implementation of the agent described in the paper. The agent learns to navigate a 2D grid world based on color-direction commands (e.g., `RED NORTH`), trained via the classic REINFORCE.
-
-### Requirements
-```bash
-pip install torch numpy matplotlib
-```
-
-### Running the Audit
-```bash
-python code/gridworld.py
-```
-
-This will do three things:
-1. train the agent (~3000 episodes);
-2. run the full grounding audit (G0–G4);
-3. report results to .txt file as well as to screen
-
-### Sample Output
-```
-GROUNDING PROFILE SUMMARY
-============================================================
-  G0  (authenticity):     Strong (learned via REINFORCE)
-  G1  (preservation):     ε_pres  = 0.0300
-  G2a (faithfulness):     ε_faith = 0.0409
-  G2b (etiological):      ACE(M)  = 1.0
-  G3  (robustness):       ω_U(0.5) = 0.0881
-  G4  (compositionality): δ_comp  = 0.0309
-============================================================
 ```
 
 ## Citation
